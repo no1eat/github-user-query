@@ -19,7 +19,7 @@
 | 文件 | 说明 |
 | --- | --- |
 | `index.html` | 主页面（单文件应用，浏览器打开即可用） |
-| `config.js` | 本地配置，存放真实 Token（已加入 `.gitignore`，勿提交） |
+| `config.js` | 本地配置，存放真实 Token（已加入 `.gitignore`，未提交） |
 | `config.example.js` | Token 配置模板（可安全发布，复制为 `config.js` 后填入自己的 Token） |
 | `README.md` | 项目说明 |
 
