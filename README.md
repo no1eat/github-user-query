@@ -18,15 +18,15 @@
 
 | 文件 | 说明 |
 | --- | --- |
-| `deepseek_html_20260908_1813b3.html` | 主页面（单文件应用，浏览器打开即可用） |
+| `index.html` | 主页面（单文件应用，浏览器打开即可用） |
 | `config.js` | 本地配置，存放真实 Token（已加入 `.gitignore`，勿提交） |
 | `config.example.js` | Token 配置模板（可安全发布，复制为 `config.js` 后填入自己的 Token） |
 | `README.md` | 项目说明 |
 
 ## 如何使用
 
-1. 保证 `deepseek_html_20260908_1813b3.html` 和 `config.js` 在同一个文件夹里。
-2. 双击 `deepseek_html_20260908_1813b3.html`，用浏览器打开。
+1. 保证 `index.html` 和 `config.js` 在同一个文件夹里。
+2. 双击 `index.html`，用浏览器打开。
 3. 在输入框输入任意 GitHub 用户名（例如 `octocat`），点击「查询」或按回车。
 4. 查看该用户的详细资料、仓库、Star 仓库和最近动态。
 5. （可选）点击左上角「图标变色」切换标签页图标颜色，点击右上角「背景变色」切换页面背景色。
