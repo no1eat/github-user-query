@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub 用户信息查询</title>
+<!-- 尝试加载 config.js，若不存在则忽略 -->
+<script src="config.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+         background:#0d1117; color:#c9d1d9; min-height:100vh; }
+  .container { max-width:900px; margin:0 auto; padding:30px 16px 60px; }
+  h1 { text-align:center; font-size:26px; color:#58a6ff; margin-bottom:6px; }
+  .sub { text-align:center; color:#8b949e; font-size:13px; margin-bottom:24px; }
+  .auth-status { display:flex; justify-content:center; align-items:center;
+                 gap:8px; margin-bottom:16px; padding:8px 16px;
+                 border-radius:8px; font-size:14px; }
+  .auth-status.logged-out { background:#3d1d1f; border:1px solid #f85149; color:#ff7b72; }
+  .auth-status.logged-in { background:#23863622; border:1px solid #23863666; color:#3fb950; }
+  .search-box { display:flex; gap:10px; margin-bottom:20px; }
+  input { flex:1; padding:12px 16px; border-radius:8px; border:1px solid #30363d;
+          background:#161b22; color:#c9d1d9; font-size:15px; outline:none; }
+  input:focus { border-color:#58a6ff; }
+  button { padding:12px 26px; border:none; border-radius:8px; background:#238636;
+           color:#fff; font-size:15px; cursor:pointer; white-space:nowrap; }
+  button:hover { background:#2ea043; }
+  button:disabled { background:#30363d; cursor:not-allowed; }
+  .error { background:#3d1d1f; border:1px solid #f85149; color:#ff7b72;
+           padding:12px 16px; border-radius:8px; margin-bottom:16px; display:none; }
+  .card { background:#161b22; border:1px solid #30363d; border-radius:12px;
+          padding:20px; margin-bottom:20px; }
+  .card h2 { font-size:17px; color:#58a6ff; margin-bottom:14px;
+             border-bottom:1px solid #30363d; padding-bottom:10px; }
+  .profile-head { display:flex; gap:18px; align-items:center; margin-bottom:16px; }
+  .avatar { width:100px; height:100px; border-radius:50%; border:3px solid #30363d; }
+  .p-name { font-size:22px; font-weight:600; color:#f0f6fc; }
+  .p-login { color:#8b949e; font-size:14px; margin:2px 0 6px; }
+  .badge { display:inline-block; background:#23863633; color:#3fb950; font-size:12px;
+           padding:3px 10px; border-radius:20px; margin-right:6px; }
+  .badge.blue { background:#388bfd33; color:#58a6ff; }
+  .bio { color:#c9d1d9; font-size:14px; margin-bottom:14px; line-height:1.6;
+         white-space: pre-wrap; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  td { padding:8px 10px; border-bottom:1px solid #21262d; vertical-align:top; }
+  td.k { color:#8b949e; width:170px; white-space:nowrap; }
+  td.v { color:#c9d1d9; word-break:break-all; }
+  a { color:#58a6ff; text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .age-box { background:#23863622; border:1px solid #23863666; border-radius:10px;
+             padding:14px 18px; margin-top:14px; }
+  .age-box .big { font-size:20px; color:#3fb950; font-weight:600; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+  .repo { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:14px; }
+  .repo .rname { font-weight:600; font-size:15px; margin-bottom:4px; }
+  .repo .rdesc { font-size:13px; color:#8b949e; margin-bottom:8px;
+                 display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .repo .rmeta { font-size:12px; color:#8b949e; display:flex; gap:12px; flex-wrap:wrap; }
+  .lang-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; }
+  .event { padding:10px 4px; border-bottom:1px solid #21262d; font-size:14px;
+           display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .event .etime { color:#8b949e; font-size:12px; white-space:nowrap; }
+  .empty { color:#8b949e; font-size:13px; padding:8px 0; }
+  .footer { text-align:center; color:#484f58; font-size:12px; margin-top:30px; }
+  .stat-row { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+  .stat { background:#0d1117; border:1px solid #30363d; border-radius:8px;
+          padding:10px 18px; text-align:center; flex:1; min-width:100px; }
+  .stat .num { font-size:22px; font-weight:700; color:#58a6ff; }
+  .stat .lbl { font-size:12px; color:#8b949e; margin-top:2px; }
+  .heatmap-img { width:100%; border-radius:8px; border:1px solid #30363d; }
+
+  .card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;
+                 border-bottom:1px solid #30363d; padding-bottom:10px; }
+  .card-header h2 { font-size:17px; color:#58a6ff; margin:0; border:none; padding:0; }
+  .expand-starred-btn { background:#388bfd; color:#fff; padding:6px 14px; border-radius:6px;
+                        border:none; cursor:pointer; font-size:13px; }
+  .expand-starred-btn:hover { background:#316dca; }
+
+  .overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+             background:#0d1117; z-index:1000; overflow-y:auto; }
+  .overlay.active { display:block; }
+  .overlay-header { position:sticky; top:0; background:#161b22; padding:15px 20px;
+                    display:flex; justify-content:space-between; align-items:center;
+                    border-bottom:1px solid #30363d; z-index:10; }
+  .overlay-header h2 { color:#58a6ff; font-size:18px; }
+  .back-btn { background:#238636; color:#fff; padding:8px 16px; border:none; border-radius:8px;
+              cursor:pointer; font-size:14px; }
+  .back-btn:hover { background:#2ea043; }
+  .overlay-content { max-width:1200px; margin:0 auto; padding:20px; }
+  .overlay-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+  .load-more-btn { display:block; margin:20px auto; background:#388bfd; color:#fff;
+                   padding:10px 24px; border:none; border-radius:8px; cursor:pointer; }
+  .load-more-btn:hover { background:#316dca; }
+  .load-more-btn:disabled { background:#30363d; cursor:not-allowed; }
+  .load-hint { text-align:center; color:#8b949e; font-size:13px; padding:16px 0; }
+  .corner-btn { position:fixed; z-index:2000; padding:8px 14px; border:1px solid #30363d;
+                border-radius:8px; background:#161b22; color:#c9d1d9; cursor:pointer; font-size:13px; }
+  .corner-btn:hover { border-color:#58a6ff; background:#1f2937; }
+  .btn-top-left { top:12px; left:12px; }
+  .btn-top-right { top:12px; right:12px; }
+</style>
+</head>
+<body>
+<button id="favicon-btn" class="corner-btn btn-top-left" onclick="cycleFaviconColor()" title="切换标签页图标颜色">🎨 图标变色</button>
+<button id="bg-btn" class="corner-btn btn-top-right" onclick="cycleBgColor()" title="切换页面背景颜色">🌓 背景变色</button>
+<div class="container">
+  <h1>🔍 GitHub 用户信息查询</h1>
+  <div class="sub">基于 GitHub 公开 API · 未登录限额 60 次/小时</div>
+
+  <!-- 登录状态提示 -->
+  <div id="auth-status" class="auth-status logged-out"></div>
+
+  <div class="search-box">
+    <input id="username" placeholder="输入 GitHub 用户名，如：octocat" autofocus>
+    <button id="btn" onclick="query()">查询</button>
+  </div>
+
+  <div class="error" id="error"></div>
+  <div id="result"></div>
+
+  <div class="footer">数据来自 api.github.com · 时间已自动转换为北京时间 (UTC+8)</div>
+</div>
+
+<!-- 全屏覆盖层 -->
+<div id="starred-overlay" class="overlay">
+  <div class="overlay-header">
+    <h2>⭐ Star仓库<span id="overlay-starred-count"></span></h2>
+    <button class="back-btn" onclick="closeStarredOverlay()">← 返回</button>
+  </div>
+  <div class="overlay-content">
+    <div id="overlay-repo-list" class="overlay-grid"></div>
+    <div id="overlay-load-hint" class="load-hint"></div>
+  </div>
+</div>
+
+<!-- 全屏覆盖层：用户自己的仓库 -->
+<div id="repos-overlay" class="overlay">
+  <div class="overlay-header">
+    <h2>📦 仓库列表</h2>
+    <button class="back-btn" onclick="closeReposOverlay()">← 返回</button>
+  </div>
+  <div class="overlay-content">
+    <div id="repos-overlay-list" class="overlay-grid"></div>
+    <div id="repos-overlay-load-hint" class="load-hint"></div>
+  </div>
+</div>
+
+<script>
+// ========== 不再声明新变量，直接使用 window.GITHUB_TOKEN ==========
+const hasToken = typeof window.GITHUB_TOKEN !== 'undefined' && window.GITHUB_TOKEN !== '';
+
+// 基础工具函数
+const $ = id => document.getElementById(id);
+const LANG_COLORS = {JavaScript:"#f1e05a",Python:"#3572A5",Java:"#b07219",HTML:"#e34c26",
+  CSS:"#563d7c",TypeScript:"#3178c6",Go:"#00ADD8",Rust:"#dea584",C:"#555555","C++":"#f34b7d",
+  "C#":"#178600",PHP:"#4F5D95",Ruby:"#701516",Swift:"#F05138",Kotlin:"#A97BFF",Shell:"#89e051",
+  Vue:"#41b883",Dart:"#00B4AB",Lua:"#000080"};
+
+// 认证头
+function authHeaders() {
+  const headers = { 'Accept': 'application/vnd.github+json' };
+  if (hasToken) {
+    headers['Authorization'] = `Bearer ${window.GITHUB_TOKEN}`;
+  }
+  return headers;
+}
+
+// 更新登录状态显示
+function updateAuthStatus() {
+  const statusDiv = $("auth-status");
+  if (hasToken) {
+    statusDiv.className = "auth-status logged-in";
+    statusDiv.innerHTML = "🔑 已登录（使用 Token，限额 5000 次/小时）";
+  } else {
+    statusDiv.className = "auth-status logged-out";
+    statusDiv.innerHTML = "🔓 未登录（匿名访问，限额 60 次/小时）<br>配置 config.js 中的 Token 可提升限额";
+  }
+}
+
+// 页面加载时立即显示状态
+updateAuthStatus();
+
+async function getJSON(url) {
+  try {
+    const r = await fetch(url, { headers: authHeaders() });
+    if (r.status === 404) throw new Error("用户不存在，检查用户名是否拼写正确");
+    if (r.status === 403) {
+      const rl = await getJSON2("https://api.github.com/rate_limit");
+      const reset = new Date(rl.resources.core.reset * 1000);
+      throw new Error("API 限额已用完 ⏳ 重置时间：" + fmt(reset) +
+        "（登录后限额提升到 5000 次/小时）");
+    }
+    if (!r.ok) throw new Error("请求失败：HTTP " + r.status);
+    return r.json();
+  } catch (err) {
+    console.error("getJSON error:", err);
+    throw err;
+  }
+}
+
+async function getJSON2(url) { 
+  try {
+    const r = await fetch(url, { headers: authHeaders() }); 
+    if (!r.ok) throw new Error("网络请求异常"); 
+    return r.json(); 
+  } catch (err) {
+    console.error("getJSON2 error:", err);
+    throw err;
+  }
+}
+
+// 时间格式化 & 年龄计算
+function fmt(date) {
+  return new Date(date).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false });
+}
+
+function calcAge(created) {
+  const c = new Date(created);
+  const n = new Date();
+  const cUtc = new Date(c.getTime() + c.getTimezoneOffset() * 60000);
+  const nUtc = new Date(n.getTime() + n.getTimezoneOffset() * 60000);
+  let y = nUtc.getUTCFullYear() - cUtc.getUTCFullYear();
+  let m = nUtc.getUTCMonth() - cUtc.getUTCMonth();
+  let d = nUtc.getUTCDate() - cUtc.getUTCDate();
+  if (d < 0) { m--; d += new Date(Date.UTC(nUtc.getUTCFullYear(), nUtc.getUTCMonth(), 0)).getUTCDate(); }
+  if (m < 0) { y--; m += 12; }
+  const days = Math.floor((n - c) / 86400000);
+  const anniv = (cUtc.getUTCMonth() === nUtc.getUTCMonth() && cUtc.getUTCDate() === nUtc.getUTCDate());
+  return { text: y + " 年 " + m + " 个月 " + d + " 天", days, anniv };
+}
+
+// HTML 安全转义
+function esc(s){ const d=document.createElement("div"); d.textContent=s==null?"":String(s); return d.innerHTML; }
+
+// 仓库卡片模板
+function repoCard(r) {
+  return `
+    <div class="repo">
+      <div class="rname"><a href="${r.html_url}" target="_blank" rel="noopener">${esc(r.full_name)}</a></div>
+      <div class="rdesc">${esc(r.description)||'<span style="color:#484f58">暂无描述</span>'}</div>
+      <div class="rmeta">
+        ${r.language?`<span><span class="lang-dot" style="background:${LANG_COLORS[r.language]||'#8b949e'}"></span>${esc(r.language)}</span>`:""}
+        <span>⭐ ${r.stargazers_count}</span>
+        <span>🍴 ${r.forks_count}</span>
+        <span>👁 ${r.watchers_count}</span>
+      </div>
+    </div>`;
+}
+
+// 获取 Star 仓库（支持分页）
+async function fetchPreview(username) {
+  const url = `https://api.github.com/users/${encodeURIComponent(username)}/starred?per_page=7`;
+  const response = await fetch(url, { headers: authHeaders() });
+  if (!response.ok) throw new Error("请求失败：HTTP " + response.status);
+  const data = await response.json();
+  const link = response.headers.get('Link');
+  const hasMore = data.length > 6 && link && link.includes('rel="next"');
+  return { data: data.slice(0,6), hasMore };
+}
+
+async function fetchStarredPage(username, page) {
+  const url = `https://api.github.com/users/${encodeURIComponent(username)}/starred?per_page=20&page=${page}`;
+  const response = await fetch(url, { headers: authHeaders() });
+  if (!response.ok) throw new Error("请求失败：HTTP " + response.status);
+  const data = await response.json();
+  const link = response.headers.get('Link');
+  return { data, hasMore: link && link.includes('rel="next"') };
+}
+
+async function fetchReposPage(username, page) {
+  const url = `https://api.github.com/users/${encodeURIComponent(username)}/repos?per_page=20&page=${page}&sort=updated`;
+  const response = await fetch(url, { headers: authHeaders() });
+  if (!response.ok) throw new Error("请求失败：HTTP " + response.status);
+  const data = await response.json();
+  const link = response.headers.get('Link');
+  return { data, hasMore: link && link.includes('rel="next"') };
+}
+
+// 获取 Star 总数（通过 Link 响应头的 last 页数）
+async function getStarredCount(username) {
+  try {
+    const url = `https://api.github.com/users/${encodeURIComponent(username)}/starred?per_page=1`;
+    const response = await fetch(url, { headers: authHeaders() });
+    if (!response.ok) return null;
+    const link = response.headers.get('Link');
+    if (link) {
+      const m = link.match(/[?&]page=(\d+)>;\s*rel="last"/);
+      if (m) return parseInt(m[1], 10);
+    }
+    const data = await response.json();
+    return data.length;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 主查询函数
+let currentUser = '';
+let overlayPage = 1;
+let overlayHasMore = false;
+let overlayLoading = false;
+let reposCurrentUser = '';
+let reposOverlayPage = 1;
+let reposOverlayHasMore = false;
+let reposOverlayLoading = false;
+let starredCount = 0;
+
+async function query() {
+  let u = $("username").value.trim().replace(/^@/, "");
+  if (!u) {
+    $("error").textContent = "⚠️ 请输入 GitHub 用户名";
+    $("error").style.display = "block";
+    return;
+  }
+  
+  $("btn").disabled = true; $("btn").textContent = "查询中…";
+  $("error").style.display = "none"; $("result").innerHTML = "";
+  try {
+    const user = await getJSON("https://api.github.com/users/" + encodeURIComponent(u));
+    const age = calcAge(user.created_at);
+    let repos = [], events = [];
+    try { repos = await getJSON(user.repos_url + "?per_page=100&sort=updated"); } catch(e){}
+    try { events = await getJSON(user.events_url.replace("{/privacy}","") + "?per_page=30"); } catch(e){}
+
+    const totalStars = repos.reduce((s,r)=>s+r.stargazers_count,0);
+    const totalForks = repos.reduce((s,r)=>s+r.forks_count,0);
+    const langSet = [...new Set(repos.map(r=>r.language).filter(Boolean))];
+
+    let rows = "";
+    const add = (k, v) => {
+      const display = (v !== null && v !== undefined && v !== '') 
+        ? v 
+        : '<span style="color:#484f58">未填写</span>';
+      rows += `<tr><td class="k">${k}</td><td class="v">${display}</td></tr>`;
+    };
+    add("用户名 (login)", esc(user.login));
+    add("用户 ID", user.id + " <span style='color:#8b949e;font-size:12px'>（ID 越小注册越早）</span>");
+    add("姓名", esc(user.name));
+    add("个人简介", esc(user.bio));
+    add("公司", esc(user.company));
+    add("所在地", esc(user.location));
+    add("邮箱", user.email ? `<a href="mailto:${esc(user.email)}">${esc(user.email)}</a>` : "");
+    add("个人网站", user.blog ? `<a href="${esc(user.blog)}" target="_blank" rel="noopener">${esc(user.blog)}</a>` : "");
+    add("Twitter", user.twitter_username ? `<a href="https://twitter.com/${esc(user.twitter_username)}" target="_blank" rel="noopener">@${esc(user.twitter_username)}</a>` : "");
+    add("GitHub 主页", `<a href="${user.html_url}" target="_blank" rel="noopener">${user.html_url}</a>`);
+    add("注册时间", fmt(new Date(user.created_at)) + " <span style='color:#8b949e;font-size:12px'>（UTC "+user.created_at.replace("T"," ").replace("Z","")+"）</span>");
+    add("资料更新时间", fmt(new Date(user.updated_at)) + " <span style='color:#8b949e;font-size:12px'>（UTC "+user.updated_at.replace("T"," ").replace("Z","")+"）</span>");
+    add("管理员", user.site_admin ? "是" : "否");
+    add("公开 Gist 数", user.public_gists);
+
+    reposCurrentUser = user.login;
+    const repoPreview = repos.length ? repos.slice(0, 6).map(repoCard).join('') : '<div class="empty">没有公开仓库</div>';
+    const reposExpandBtn = repos.length > 6 ? `<button class="expand-starred-btn" onclick="openReposOverlay()">展开全部</button>` : '';
+
+    // Star 仓库预览
+    let starredPreview = '';
+    let expandBtn = '';
+    try {
+      const preview = await fetchPreview(user.login);
+      currentUser = user.login;
+      starredPreview = preview.data.length ? preview.data.map(repoCard).join('') : '<div class="empty">没有 Star 的公开仓库</div>';
+      starredCount = await getStarredCount(user.login);
+      if (starredCount == null) starredCount = preview.data.length;
+      if (preview.hasMore) {
+        expandBtn = `<button class="expand-starred-btn" onclick="openStarredOverlay()">展开全部</button>`;
+      }
+    } catch (e) {
+      starredPreview = '<div class="empty">获取 Star 仓库失败</div>';
+      expandBtn = '';
+      starredCount = 0;
+    }
+
+    const EVT = {PushEvent:"Push 了代码",CreateEvent:"创建了资源",WatchEvent:"Star 了仓库",
+      ForkEvent:"Fork 了仓库",IssuesEvent:"操作了 Issue",IssueCommentEvent:"评论了 Issue",
+      PullRequestEvent:"操作了 PR",PullRequestReviewEvent:"评审了 PR",ReleaseEvent:"发布了 Release",
+      DeleteEvent:"删除了资源",PublicEvent:"公开了仓库",GollumEvent:"更新了 Wiki",MemberEvent:"添加了协作者"};
+    const evtRows = events.length ? events.slice(0,20).map(e=>`
+      <div class="event">
+        <span>${EVT[e.type]||e.type} → <a href="https://github.com/${esc(e.repo.name)}" target="_blank" rel="noopener">${esc(e.repo.name)}</a></span>
+        <span class="etime">${fmt(new Date(e.created_at))}</span>
+      </div>`).join("") : '<div class="empty">最近没有公开动态</div>';
+
+    $("result").innerHTML = `
+      <div class="card">
+        <div class="profile-head">
+          <img class="avatar" src="${user.avatar_url}" alt="avatar">
+          <div>
+            <div class="p-name">${esc(user.name)||esc(user.login)}</div>
+            <div class="p-login">@${esc(user.login)}</div>
+            <span class="badge">注册于 ${user.created_at.slice(0,4)} 年</span>
+            <span class="badge blue">${age.days} 天</span>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="num">${user.public_repos}</div><div class="lbl">公开仓库</div></div>
+          <div class="stat"><div class="num">${user.followers}</div><div class="lbl">粉丝</div></div>
+          <div class="stat"><div class="num">${user.following}</div><div class="lbl">关注</div></div>
+          <div class="stat"><div class="num">${totalStars}</div><div class="lbl">获星总数</div></div>
+          <div class="stat"><div class="num">${totalForks}</div><div class="lbl">被 Fork 总数</div></div>
+          <div class="stat"><div class="num">${repos.filter(r=>!r.fork).length}</div><div class="lbl">原创仓库</div></div>
+        </div>
+        ${user.bio?`<div class="bio">${esc(user.bio)}</div>`:""}
+        <table>${rows}</table>
+        <div class="age-box">
+          🎂 账号已满 <span class="big">${age.text}</span>（共 ${age.days} 天）
+          ${age.anniv?'<div style="color:#3fb950;margin-top:6px">🎉 今天正好是注册周年纪念日！</div>':""}
+        </div>
+      </div>
+
+      <!-- 贡献热力图 -->
+      <div class="card">
+        <h2>🔥 贡献热力图（最近一年）</h2>
+        <img class="heatmap-img" src="https://ghchart.rshah.org/${user.login}" alt="贡献热力图">
+      </div>
+
+      <!-- 用户自己的仓库 -->
+      <div class="card">
+        <div class="card-header">
+          <h2>📦 仓库列表（${user.public_repos}）</h2>
+          ${reposExpandBtn}
+        </div>
+        <div style="margin-bottom:12px;color:#8b949e;font-size:13px">使用语言：${langSet.length?langSet.map(l=>`<span class="lang-dot" style="background:${LANG_COLORS[l]||'#8b949e'}"></span>${l}`).join("　"):"暂无"}</div>
+        <div class="grid">${repoPreview}</div>
+      </div>
+
+      <!-- Star 的仓库（折叠显示前6个） -->
+      <div class="card">
+        <div class="card-header">
+          <h2>⭐ Star 的仓库${starredCount > 0 ? `（${starredCount}）` : ''}</h2>
+          ${expandBtn}
+        </div>
+        <div class="grid">${starredPreview}</div>
+      </div>
+
+      <!-- 最近动态 -->
+      <div class="card">
+        <h2>⚡ 最近动态（最近 20 条）</h2>
+        ${evtRows}
+      </div>`;
+
+  } catch (e) {
+    $("error").textContent = "⚠️ " + e.message;
+    $("error").style.display = "block";
+  }
+  $("btn").disabled = false; $("btn").textContent = "查询";
+}
+
+/* 全屏覆盖层相关函数 */
+async function openStarredOverlay() {
+  if (!currentUser) return;
+  const overlay = $("starred-overlay");
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  hideCornerButtons();
+  $("overlay-starred-count").textContent = starredCount > 0 ? `（${starredCount}）` : '';
+  overlayPage = 1;
+  overlayHasMore = false;
+  $("overlay-repo-list").innerHTML = '';
+  $("overlay-load-hint").textContent = '';
+  await loadOverlayPage(1);
+  overlay.scrollTop = 0;
+}
+
+function closeStarredOverlay() {
+  $("starred-overlay").classList.remove('active');
+  document.body.style.overflow = '';
+  showCornerButtons();
+}
+
+async function loadOverlayPage(page) {
+  try {
+    const { data, hasMore } = await fetchStarredPage(currentUser, page);
+    if (page === 1) {
+      overlayPage = 1;
+      $("overlay-repo-list").innerHTML = '';
+    }
+    const listDiv = $("overlay-repo-list");
+    data.forEach(r => {
+      listDiv.innerHTML += repoCard(r);
+    });
+    overlayHasMore = hasMore;
+    $("overlay-load-hint").textContent = hasMore ? '' : (listDiv.children.length ? '已显示全部' : '');
+  } catch (e) {
+    alert("加载失败：" + e.message);
+  }
+}
+
+function loadMoreOverlay() {
+  if (overlayLoading || !overlayHasMore) return;
+  overlayLoading = true;
+  $("overlay-load-hint").textContent = '加载中…';
+  loadOverlayPage(overlayPage + 1).finally(() => {
+    overlayPage++;
+    overlayLoading = false;
+  });
+}
+
+/* 用户自己仓库的全屏覆盖层 */
+async function openReposOverlay() {
+  if (!reposCurrentUser) return;
+  const overlay = $("repos-overlay");
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  hideCornerButtons();
+  reposOverlayPage = 1;
+  reposOverlayHasMore = false;
+  $("repos-overlay-list").innerHTML = '';
+  $("repos-overlay-load-hint").textContent = '';
+  await loadReposOverlayPage(1);
+  overlay.scrollTop = 0;
+}
+
+function closeReposOverlay() {
+  $("repos-overlay").classList.remove('active');
+  document.body.style.overflow = '';
+  showCornerButtons();
+}
+
+async function loadReposOverlayPage(page) {
+  try {
+    const { data, hasMore } = await fetchReposPage(reposCurrentUser, page);
+    if (page === 1) {
+      reposOverlayPage = 1;
+      $("repos-overlay-list").innerHTML = '';
+    }
+    const listDiv = $("repos-overlay-list");
+    data.forEach(r => { listDiv.innerHTML += repoCard(r); });
+    reposOverlayHasMore = hasMore;
+    $("repos-overlay-load-hint").textContent = hasMore ? '' : (listDiv.children.length ? '已显示全部' : '');
+  } catch (e) {
+    alert("加载失败：" + e.message);
+  }
+}
+
+function loadMoreReposOverlay() {
+  if (reposOverlayLoading || !reposOverlayHasMore) return;
+  reposOverlayLoading = true;
+  $("repos-overlay-load-hint").textContent = '加载中…';
+  loadReposOverlayPage(reposOverlayPage + 1).finally(() => {
+    reposOverlayPage++;
+    reposOverlayLoading = false;
+  });
+}
+
+$("username").addEventListener("keydown", e => { if (e.key === "Enter") query(); });
+
+// 滚动到底部附近自动加载更多
+$("starred-overlay").addEventListener("scroll", () => {
+  const el = $("starred-overlay");
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) loadMoreOverlay();
+});
+$("repos-overlay").addEventListener("scroll", () => {
+  const el = $("repos-overlay");
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) loadMoreReposOverlay();
+});
+
+// ===== 动态 favicon =====
+const FAVICON_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#db2777', '#0891b2'];
+let faviconColorIndex = 0;
+
+function setFavicon(color) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="6" y="6" width="88" height="88" rx="20" fill="${color}"/><text x="50" y="50" font-size="56" font-family="'Microsoft YaHei','PingFang SC',sans-serif" font-weight="bold" text-anchor="middle" dominant-baseline="central" fill="#ffffff">不</text></svg>`;
+  let link = document.querySelector("link[rel~='icon']");
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+  link.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+function cycleFaviconColor() {
+  faviconColorIndex = (faviconColorIndex + 1) % FAVICON_COLORS.length;
+  setFavicon(FAVICON_COLORS[faviconColorIndex]);
+}
+
+// ===== 背景颜色切换 =====
+const BG_COLORS = ['#0d1117', '#0b1e33', '#331b1b', '#0d2e1f', '#33270b', '#251033'];
+let bgColorIndex = 0;
+
+function cycleBgColor() {
+  bgColorIndex = (bgColorIndex + 1) % BG_COLORS.length;
+  document.body.style.backgroundColor = BG_COLORS[bgColorIndex];
+}
+
+// 覆盖层打开时隐藏角落按钮，避免遮挡“展开全部”和“返回”
+function hideCornerButtons() {
+  $("favicon-btn").style.display = 'none';
+  $("bg-btn").style.display = 'none';
+}
+function showCornerButtons() {
+  $("favicon-btn").style.display = '';
+  $("bg-btn").style.display = '';
+}
+
+// 初始化 favicon
+setFavicon(FAVICON_COLORS[faviconColorIndex]);
+</script>
+</body>
+</html>
